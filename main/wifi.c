@@ -17,6 +17,9 @@
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
+#include "mdns.h"
+#include "lwip/apps/netbiosns.h"
+
 /* The examples use WiFi configuration that you can set via project configuration menu
    If you'd rather not, just change the below entries to strings with
    the config you want - ie #define EXAMPLE_WIFI_SSID "mywifissid"
@@ -52,6 +55,8 @@ static EventGroupHandle_t s_wifi_event_group;
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT      BIT1
 
+#define MDNS_INSTANCE "smart inverter"
+
 static const char *TAG = "wifi station";
 
 static int s_retry_num = 0;
@@ -79,6 +84,21 @@ static void event_handler(void* arg, esp_event_base_t event_base,
     }
 }
 
+static void initialise_mdns(void)
+{
+    mdns_init();
+    mdns_hostname_set(CONFIG_EXAMPLE_MDNS_HOST_NAME);
+    mdns_instance_name_set(MDNS_INSTANCE);
+
+    mdns_txt_item_t serviceTxtData[] = {
+            {"board", "esp32"},
+            {"path", "/"}
+    };
+
+    ESP_ERROR_CHECK(mdns_service_add("ESP32-WebServer", "_http", "_tcp", 80, serviceTxtData,
+                                     sizeof(serviceTxtData) / sizeof(serviceTxtData[0])));
+}
+
 void wifi_init_sta(void)
 {
     s_wifi_event_group = xEventGroupCreate();
@@ -86,6 +106,11 @@ void wifi_init_sta(void)
     ESP_ERROR_CHECK(esp_netif_init());
 
     ESP_ERROR_CHECK(esp_event_loop_create_default());
+
+    initialise_mdns();
+    netbiosns_init();
+    netbiosns_set_name(CONFIG_EXAMPLE_MDNS_HOST_NAME);
+
     esp_netif_create_default_wifi_sta();
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
@@ -142,5 +167,8 @@ void wifi_init_sta(void)
     } else {
         ESP_LOGE(TAG, "UNEXPECTED EVENT");
     }
+
+
+
 }
 

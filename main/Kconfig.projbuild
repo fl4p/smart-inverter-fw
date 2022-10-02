@@ -45,6 +45,13 @@ menu "Smart Inverter"
     endchoice
 
 
+    config EXAMPLE_MDNS_HOST_NAME
+        string "mDNS Host Name"
+        default "smart-inverter"
+        help
+            Specify the domain name used in the mDNS service.
+
+
     config EXAMPLE_BASIC_AUTH
         bool "Basic Authentication"
         default n

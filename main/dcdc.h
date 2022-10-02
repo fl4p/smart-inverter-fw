@@ -1,8 +1,22 @@
-//
-// Created by Fabian on 02.10.2022.
-//
 
-#ifndef SMART_INVERTER_DCDC_H
-#define SMART_INVERTER_DCDC_H
+#pragma once
 
-#endif //SMART_INVERTER_DCDC_H
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
+
+typedef struct  {
+    uint32_t deadTime100Ns;
+    uint32_t frequency;
+} dcdc_params;
+
+void dcdc_main();
+
+void dcdc_set_params(dcdc_params params);
+
+
+#ifdef __cplusplus
+}
+#endif

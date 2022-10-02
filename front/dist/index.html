@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Smart Inverter</title>
+    <style>
+        body {
+            font: 1rem 'Fira Sans', sans-serif;
+        }
+
+        input[type='range'] {
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+<div style="max-width: 40em; width: 100%; margin: auto;" id="dcdc_control">
+
+    <input type="range" min="20000" max="80000" step="1000" id="dcdc_frequency"
+           oninput="this.nextElementSibling.value = this.value">
+    <output></output>
+    <label for="dcdc_frequency">Freq</label>
+
+    <input type="range" min="5" max="200" step="1" id="dcdc_deadTime100Ns"
+           oninput="this.nextElementSibling.value = this.value">
+    <output></output>
+    <label for="dcdc_deadTime100Ns">Dead Time (100ns)</label>
+
+</div>
+
+<script>
+    var $ = document.querySelector.bind(document);
+    $('#dcdc_control').oninput = () => {
+        const p = {frequency: +$('#dcdc_frequency').value, deadTime100Ns: +$('#dcdc_deadTime100Ns').value};
+        fetch("http://smart-inverter.local/api/v1/dcdc", {
+            "headers": {"content-type": "application/json"},
+            "body": JSON.stringify(p),
+            "method": "POST",
+            "mode": "cors",
+            "credentials": "omit"
+        });
+        console.log('inp', p);
+    };
+</script>
+
+</body>
+</html>
