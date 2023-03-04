@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.2">
     <title>Smart Inverter</title>
     <style>
         body {
@@ -11,37 +12,75 @@
         input[type='range'] {
             width: 100%;
         }
+
+        #log-output .err {
+            color: red;
+            background-color: rgba(255, 0, 0, 0.2);
+        }
     </style>
 </head>
 <body>
 
-<div style="max-width: 40em; width: 100%; margin: auto;" id="dcdc_control">
+<div style="max-width: 40em; width: 100%; margin: auto; margin-top:2em;">
 
-    <input type="range" min="20000" max="80000" step="1000" id="dcdc_frequency"
-           oninput="this.nextElementSibling.value = this.value">
-    <output></output>
-    <label for="dcdc_frequency">Freq</label>
+    <div id="dcdc_control">
+        <input type="range" min="5000" max="200000" step="1000" value="42000" id="dcdc_frequency"
+               oninput="this.nextElementSibling.value = this.value">
+        <output></output>
+        <label for="dcdc_frequency">Freq</label>
 
-    <input type="range" min="5" max="200" step="1" id="dcdc_deadTime100Ns"
-           oninput="this.nextElementSibling.value = this.value">
-    <output></output>
-    <label for="dcdc_deadTime100Ns">Dead Time (100ns)</label>
+        <input type="range" min="5" max="120" step="1" value="20" id="dcdc_deadTime100Ns"
+               oninput="this.nextElementSibling.value = this.value">
+        <output></output>
+        <label for="dcdc_deadTime100Ns">Dead Time (100ns)</label>
 
+        <button style="height: 3em; display: block" onclick="setMaxDeadTime()">Max DT</button>
+    </div>
+
+    <ul id="log-output"
+        style="background: antiquewhite; font-family: monospace; list-style: none; height:20em; overflow-y:scroll; padding-left:.3em"></ul>
 </div>
 
+
 <script>
-    var $ = document.querySelector.bind(document);
+    const $ = document.querySelector.bind(document);
+    document.querySelectorAll('input').forEach(inp => inp.oninput && inp.oninput(null)); // update labels
     $('#dcdc_control').oninput = () => {
-        const p = {frequency: +$('#dcdc_frequency').value, deadTime100Ns: +$('#dcdc_deadTime100Ns').value};
-        fetch("http://smart-inverter.local/api/v1/dcdc", {
+        const dtInp = $('#dcdc_deadTime100Ns'), fInp = $('#dcdc_frequency');
+        const dtMax = (1e7 * .5 / +fInp.value).toFixed(0);
+        if (dtInp.max !== dtMax) {
+            dtInp.max = dtMax;
+        }
+        const p = {frequency: +fInp.value, deadTime100Ns: +dtInp.value};
+
+        fetch("/api/v1/dcdc", {
             "headers": {"content-type": "application/json"},
             "body": JSON.stringify(p),
             "method": "POST",
             "mode": "cors",
             "credentials": "omit"
-        });
+        })
+            .then(async (r) => log('dcdc: ' + await r.text()))
+            .catch(e => log('error: ' + e, true));
         console.log('inp', p);
     };
+
+    const logOutput = $('#log-output');
+
+    function log(msg, is_error) {
+        const node = document.createElement("li");
+        node.appendChild(document.createTextNode(msg));
+        if (is_error || msg.indexOf('error') !== -1) node.classList.add('err');
+        logOutput.appendChild(node);
+        //node.scrollIntoView();
+        logOutput.scrollTop = logOutput.scrollHeight;
+    }
+
+    function setMaxDeadTime() {
+        const dtInp = $('#dcdc_deadTime100Ns');
+        dtInp.value = dtInp.max;
+        $('#dcdc_control').oninput(null);
+    }
 </script>
 
 </body>
