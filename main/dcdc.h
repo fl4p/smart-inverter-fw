@@ -14,7 +14,7 @@ typedef struct  {
 
 void dcdc_main();
 
-void dcdc_set_params(dcdc_params params);
+esp_err_t dcdc_set_params(dcdc_params params);
 
 
 #ifdef __cplusplus
