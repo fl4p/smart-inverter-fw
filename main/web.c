@@ -132,17 +132,25 @@ static esp_err_t light_brightness_post_handler(httpd_req_t *req)
     cJSON *root = cJSON_Parse(buf);
     int frequency = cJSON_GetObjectItem(root, "frequency")->valueint;
     int deadTime100Ns = cJSON_GetObjectItem(root, "deadTime100Ns")->valueint;
+    cJSON_Delete(root);
+
 
     ESP_LOGI(REST_TAG, "DCDC control: frequency = %d, deadTime = %d", frequency, deadTime100Ns);
 
-    //dcdc_set_params((dcdc_params) {.frequency = frequency, .deadTime100Ns = deadTime100Ns});
 
+    if(dcdc_set_params((dcdc_params) {.frequency = frequency, .deadTime100Ns = deadTime100Ns}) != ESP_OK) {
+        return ESP_FAIL;
+    }
 
-    //ESP_LOGI(REST_TAG, "Light control: red = %d, green = %d, blue = %d", red, green, blue);
+    float period = (1.f / frequency);
+    float duty = (period - 2.f * deadTime100Ns * 1e-7f) / period;
 
-    cJSON_Delete(root);
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-    httpd_resp_sendstr(req, "Post control value successfully");
+
+    char resp_buf[200];
+    sprintf(resp_buf, "freq=%d deadTime=%d duty=%.1f%%", frequency, deadTime100Ns, duty*100);
+    httpd_resp_sendstr(req, resp_buf);
+
     return ESP_OK;
 }
 

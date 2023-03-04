@@ -15,3 +15,8 @@ https://esp32.com/viewtopic.php?t=15856
 
 ..\esp-idf-v5.0\export.bat
 idf.py build && idf.py -p COM3 flash && idf.py -p COM3 monitor
+
+
+# TODO
+* DCDC burst mode
+* SPWM
