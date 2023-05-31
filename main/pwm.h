@@ -30,11 +30,16 @@ struct PWMSignal {
 
     bool softStarting = false;
 
+    bool started = false;
+
+    //PWMSignal(const PWMSignal&) = delete;
+
 
     void _newTimer(uint32_t period_ticks) {
         if (timer) {
-            stop();
+            if (started) stop();
             mcpwm_del_timer(timer);
+            timer = nullptr;
         }
 
         mcpwm_timer_config_t timer_config = {
@@ -67,6 +72,7 @@ struct PWMSignal {
         ESP_ERROR_CHECK(mcpwm_new_generator(operator_, &gen_config, &generator));
 
 
+
         // set output low when comparator evals true
         ESP_ERROR_CHECK(mcpwm_generator_set_action_on_compare_event(
                 generator,
@@ -85,6 +91,7 @@ struct PWMSignal {
 
         ESP_ERROR_CHECK(mcpwm_timer_enable(timer));
         ESP_ERROR_CHECK(mcpwm_timer_start_stop(timer, MCPWM_TIMER_START_NO_STOP));
+        started = true;
     }
 
     void stop() {
@@ -95,22 +102,33 @@ struct PWMSignal {
         // wait 2 timer periods to ensure generator goes low
         vTaskDelay(pdMS_TO_TICKS(period_ticks * 1000 / BLDC_MCPWM_TIMER_RESOLUTION_HZ * 2));
         ESP_ERROR_CHECK(mcpwm_timer_disable(timer));
+        started = false;
     }
 
     void set_duty_cycle(uint32_t new_duty_cycle) {
-        ESP_ERROR_CHECK(mcpwm_comparator_set_compare_value(comparator, new_duty_cycle));
-        duty_cycle = new_duty_cycle;
+        if (new_duty_cycle == duty_cycle)
+            return;
+
+        ESP_LOGI("pwm", "set duty cycle %lu", new_duty_cycle);
+        if (mcpwm_comparator_set_compare_value(comparator, new_duty_cycle) != ESP_OK) {
+            ESP_LOGE("pwm", "Failed to set duty cycle %lu", new_duty_cycle);
+        } else {
+            duty_cycle = new_duty_cycle;
+        }
     }
 
     void change_frequency(uint32_t new_period_ticks) {
         if (period_ticks == new_period_ticks)
             return;
 
+        auto started_ = started;
+
         _newTimer(new_period_ticks);
         ESP_ERROR_CHECK(mcpwm_operator_connect_timer(operator_, timer));
-        ESP_ERROR_CHECK(mcpwm_comparator_set_compare_value(comparator, duty_cycle));
+        //ESP_ERROR_CHECK(mcpwm_comparator_set_compare_value(comparator, duty_cycle));
 
-        start();
+        //set_duty_cycle(duty_cycle * new_period_ticks / period_ticks);
+        if (started_) start();
         period_ticks = new_period_ticks;
     }
 
@@ -121,7 +139,7 @@ struct PWMSignal {
             return;
         }
 
-        ESP_LOGI("pwm", "Soft-start..");
+        ESP_LOGI("pwm", "Soft-start to %lu..", duty_cycle);
         softStarting = true;
         soft_start_args *timer_args = new soft_start_args(this, duty_cycle, steps);
 
@@ -144,7 +162,7 @@ void update_soft_start_callback(void *args_) {
     PWMSignal *pwmSignal = (PWMSignal *) args->arg;
 
     float p = (float) args->i / (float) args->steps;
-    float duty_cycle = map(p * p * p, 0, 1, 0, pwmSignal->duty_cycle);
+    float duty_cycle = map(p * p * p, 0, 1, 1, args->target_duty_cycle);
 
     ESP_LOGD("pwm", "soft-start p=%.2f duty_cycle=%.2f", p, duty_cycle);
 
@@ -160,3 +178,38 @@ void update_soft_start_callback(void *args_) {
         ++(args->i);
     }
 }
+
+struct PWMTimerSync {
+    //const PWMSignal &ref;
+    //const PWMSignal &other;
+    mcpwm_sync_handle_t timer_sync_source = NULL;
+    uint32_t delay_ticks;
+
+
+    PWMTimerSync(const PWMSignal &ref, const PWMSignal &other, uint32_t delay_ticks)
+            : delay_ticks(delay_ticks) {
+        _sync( ref, other);
+    }
+
+    void _sync(const PWMSignal &ref, const PWMSignal &other) {
+        mcpwm_timer_sync_src_config_t timer_sync_config = {.timer_event = MCPWM_TIMER_EVENT_EMPTY,};
+        ESP_ERROR_CHECK(mcpwm_new_timer_sync_src(ref.timer, &timer_sync_config, &timer_sync_source));
+        mcpwm_timer_sync_phase_config_t sync_phase_config = {
+                .sync_src = timer_sync_source,
+                .count_value = delay_ticks,
+                .direction = MCPWM_TIMER_DIRECTION_UP,
+
+        };
+        ESP_ERROR_CHECK(mcpwm_timer_set_phase_on_sync(other.timer, &sync_phase_config));
+    }
+
+    void stop() {
+        mcpwm_del_sync_src(timer_sync_source);
+        timer_sync_source = nullptr;
+    }
+
+    //void reconnect_timers() {
+    //    if (timer_sync_source) stop();
+    //    _sync();
+    //}
+};
