@@ -8,7 +8,7 @@ extern "C"
 
 
 typedef struct  {
-    uint32_t deadTime100Ns;
+    float dutyCycle;//0-1
     uint32_t frequency;
 } dcdc_params;
 

@@ -137,13 +137,13 @@ static esp_err_t light_brightness_post_handler(httpd_req_t *req)
 
     ESP_LOGI(REST_TAG, "DCDC control: frequency = %d, deadTime = %d", frequency, deadTime100Ns);
 
+    float period = (1.f / frequency);
+    float duty = (period - 2.f * deadTime100Ns * 1e-7f) / period;
 
-    if(dcdc_set_params((dcdc_params) {.frequency = frequency, .deadTime100Ns = deadTime100Ns}) != ESP_OK) {
+    if(dcdc_set_params((dcdc_params) {.frequency = frequency, .dutyCycle = duty}) != ESP_OK) {
         return ESP_FAIL;
     }
 
-    float period = (1.f / frequency);
-    float duty = (period - 2.f * deadTime100Ns * 1e-7f) / period;
 
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
 
